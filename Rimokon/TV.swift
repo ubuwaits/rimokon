@@ -4,18 +4,30 @@ import Security
 @MainActor final class TV: ObservableObject {
     @Published var host: String
     @Published var mac: String
-    @Published var macStatus = ""
-    private var upgradingNetworkPermission = false
-    @Published var waking = false
-    private var wakeTask: Task<Void, Never>?
-    @Published var status = "OFFLINE"
-    @Published var connected = false
-    @Published var isTVOn = false
-    @Published var navigationReady = false
+    @Published private(set) var connection: ConnectionState = .offline
+    @Published private(set) var navigation: NavigationState = .unavailable
+    @Published private(set) var power = PowerState()
+    @Published private(set) var macRetrieval: MACRetrievalState = .idle
+    @Published private var commandNotice: String?
     @Published var muted = false
+    private var wakeTask: Task<Void, Never>?
+    private var wakeGeneration = UUID()
     private var socket: URLSessionWebSocketTask?
     private var pointer: URLSessionWebSocketTask?
-    private var cursorSendInFlight = false
+
+    var connected: Bool { connection.isConnected }
+    var navigationReady: Bool { navigation.isReady }
+    var waking: Bool { power.isWaking }
+    var isTVOn: Bool { power.isOn }
+    var macStatus: String { macRetrieval.status }
+    var status: String {
+        if let commandNotice { return commandNotice }
+        if waking { return "WAKING" }
+        if case .awaitingApproval = connection { return connection.status }
+        if let status = power.status { return status }
+        if connected && navigation == .recovering { return "RECONNECTING" }
+        return connection.status
+    }
     private var heartbeat: Task<Void, Never>?
     private var timeout: Task<Void, Never>?
     private var generation = UUID()
@@ -38,16 +50,16 @@ import Security
 
     func connect(requestNetworkPermission: Bool = false) {
         disconnect(stopWake: false)
-        upgradingNetworkPermission = requestNetworkPermission
         let configuration = TVConfiguration(host: host, mac: mac)
         guard configuration.validHost,
               let url = URL(string: "ws://\(configuration.host):3000") else {
-            status = host.isEmpty ? "SET UP TV" : "CHECK IP ADDRESS"
+            connection = host.isEmpty ? .needsConfiguration : .invalidAddress
             return
         }
         host = configuration.host
         UserDefaults.standard.set(host, forKey: "tvHost")
-        status = "CONNECTING"
+        connection = .connecting(requestNetworkPermission ? .networkPermission : .normal)
+        if requestNetworkPermission { macRetrieval = .requestingPermission }
         let token = generation
         let task = URLSession.shared.webSocketTask(with: url)
         socket = task
@@ -60,21 +72,22 @@ import Security
         timeout = Task { [weak self] in
             try? await Task.sleep(for: .seconds(60))
             guard !Task.isCancelled, let self, self.generation == token, !self.connected else { return }
-            if self.upgradingNetworkPermission { self.connect(); self.macStatus = "MAC permission not granted"; return }
-            self.disconnect(); self.status = "CONNECTION TIMED OUT"
+            if self.connection.upgradingPermission { self.connect(); self.macRetrieval = .permissionDenied; return }
+            self.disconnect(); self.connection = .failed(.timedOut)
         }
     }
 
     func disconnect(stopWake: Bool = true) {
-        if stopWake { wakeTask?.cancel(); wakeTask = nil; waking = false }
+        if stopWake { wakeGeneration = UUID(); wakeTask?.cancel(); wakeTask = nil }
         heartbeat?.cancel(); heartbeat = nil
         generation = UUID(); timeout?.cancel(); timeout = nil
         socket?.cancel(with: .goingAway, reason: nil); socket = nil
         pointer?.cancel(with: .goingAway, reason: nil); pointer = nil
-        cursorSendInFlight = false
-        navigationReady = false
-        isTVOn = false
-        connected = false; status = "OFFLINE"
+        navigation = .unavailable
+        power.disconnected(cancelWake: stopWake)
+        macRetrieval.disconnected()
+        connection = .offline
+        commandNotice = nil
     }
 
     private func receive(_ task: URLSessionWebSocketTask, token: UUID) {
@@ -83,8 +96,8 @@ import Security
                 guard let self, self.generation == token else { return }
                 switch result {
                 case .failure:
-                    if self.upgradingNetworkPermission { self.connect(); return }
-                    self.disconnect(stopWake: false); self.status = self.waking ? "WAKING" : "TV UNREACHABLE"
+                    if self.connection.upgradingPermission { self.connect(); return }
+                    self.disconnect(stopWake: false); self.connection = .failed(.unreachable)
                 case .success(let message):
                     let data: Data
                     switch message {
@@ -104,19 +117,18 @@ import Security
         let id = message["id"] as? String
         let payload = message["payload"] as? [String: Any] ?? [:]
         if type == "registered" {
-            upgradingNetworkPermission = false
             if let key = payload["client-key"] as? String { saveKey(key) }
-            timeout?.cancel(); connected = true; status = "CONNECTED"
+            timeout?.cancel(); timeout = nil; connection = .connected; commandNotice = nil
             send(["id": "volume", "type": "subscribe", "uri": "ssap://audio/getVolume"])
-            request("com.webos.service.networkinput/getPointerInputSocket", id: "pointer")
+            requestPointer()
             send(["id": "power", "type": "subscribe", "uri": "ssap://com.webos.service.tvpower/power/getPowerState"])
-            macStatus = "Reading MAC address…"
+            macRetrieval = .reading
             request("com.webos.service.connectionmanager/getinfo", id: "networkInfo")
             monitorConnection()
-        } else if id == "register", payload["pairingType"] != nil { status = "ACCEPT ON TV" }
+        } else if id == "register", payload["pairingType"] != nil { connection.awaitApproval() }
         if id == "networkInfo" {
             if type == "error" {
-                macStatus = "Automatic MAC unavailable; saved address kept"
+                macRetrieval = .unavailable
                 let attempted = UserDefaults.standard.stringArray(forKey: "networkPermissionAttemptedHosts") ?? []
                 if (message["error"] as? String)?.hasPrefix("401") == true, !attempted.contains(host) {
                     refreshMACPermission()
@@ -129,29 +141,28 @@ import Security
                     UserDefaults.standard.set(cache, forKey: "learnedTVMACs")
                     if mac.isEmpty { mac = learned[0] }
                     TVConfiguration(host: host, mac: mac).save()
-                    macStatus = "MAC retrieved automatically"
-                } else { macStatus = "Automatic MAC unavailable; saved address kept" }
+                    macRetrieval = .retrieved
+                } else { macRetrieval = .unavailable }
             }
             return
         }
         if id == "power", type != "error", let state = payload["state"] as? String {
-            isTVOn = TVPowerState.isOn(state: state, processing: payload["processing"] as? String)
-            if isTVOn { status = "CONNECTED" }
-            else if !waking { status = "STANDBY" }
+            power.report(isOn: TVPowerState.isOn(state: state, processing: payload["processing"] as? String))
+            commandNotice = nil
         }
         if id == "volume" {
             muted = payload["muted"] as? Bool ?? false
         }
         if id == "pointer", let path = payload["socketPath"] as? String, let url = URL(string: path), url.host == host {
             pointer?.cancel(with: .goingAway, reason: nil)
-            pointer = URLSession.shared.webSocketTask(with: url); pointer?.resume(); navigationReady = true; status = "CONNECTED"
+            pointer = URLSession.shared.webSocketTask(with: url); pointer?.resume(); navigation = .ready; commandNotice = nil
         }
         if type == "error" {
             if id == "register" {
-                if upgradingNetworkPermission { connect(); macStatus = "MAC permission not granted" }
-                else { disconnect(); status = "PAIRING REJECTED" }
+                if connection.upgradingPermission { connect(); macRetrieval = .permissionDenied }
+                else { disconnect(); connection = .failed(.rejected) }
             }
-            else { status = "COMMAND FAILED" }
+            else { commandNotice = "COMMAND FAILED" }
         }
     }
 
@@ -161,7 +172,7 @@ import Security
         socket?.send(.string(text)) { [weak self] error in
             if error != nil { Task { @MainActor in
                 guard let self, self.generation == token else { return }
-                self.disconnect(stopWake: false); self.status = self.waking ? "WAKING" : "TV UNREACHABLE"
+                self.disconnect(stopWake: false); self.connection = .failed(.unreachable)
             } }
         }
     }
@@ -172,17 +183,16 @@ import Security
         send(["id": id ?? "cmd\(serial)", "type": "request", "uri": "ssap://\(uri)", "payload": payload])
     }
     func button(_ name: String) {
-        guard connected, let pointer else { status = "CONTROLS NOT READY"; return }
+        guard connected, let pointer else { commandNotice = "CONTROLS NOT READY"; return }
         sendInput("type:button\nname:\(name)\n\n", to: pointer)
     }
     func moveCursor(dx: Int, dy: Int) {
-        guard navigationReady, !cursorSendInFlight, let pointer else { return }
-        cursorSendInFlight = true
+        guard let pointer, navigation.beginMovement() else { return }
         let token = generation
         pointer.send(.string("type:move\ndx:\(dx)\ndy:\(dy)\ndown:0\n\n")) { [weak self] error in
             Task { @MainActor in
                 guard let self, self.generation == token, self.pointer === pointer else { return }
-                self.cursorSendInFlight = false
+                self.navigation.finishMovement()
                 if error != nil { self.recoverPointer(pointer) }
             }
         }
@@ -203,14 +213,18 @@ import Security
         }
     }
 
+    private func requestPointer() {
+        guard connected else { return }
+        if navigation != .recovering { navigation = .requesting }
+        request("com.webos.service.networkinput/getPointerInputSocket", id: "pointer")
+    }
+
     private func recoverPointer(_ failed: URLSessionWebSocketTask) {
         guard pointer === failed else { return }
-        cursorSendInFlight = false
-        navigationReady = false
+        navigation = .recovering
         failed.cancel(with: .goingAway, reason: nil)
         pointer = nil
-        status = "RECONNECTING"
-        request("com.webos.service.networkinput/getPointerInputSocket", id: "pointer")
+        requestPointer()
     }
 
     private func monitorConnection() {
@@ -234,7 +248,7 @@ import Security
                         } }
                     }
                 } else {
-                    self.request("com.webos.service.networkinput/getPointerInputSocket", id: "pointer")
+                    self.requestPointer()
                 }
             }
         }
@@ -251,29 +265,31 @@ import Security
         guard !waking else { return }
         let learned = (UserDefaults.standard.dictionary(forKey: "learnedTVMACs") as? [String: [String]])?[host] ?? []
         let packets = Array(Set([mac] + learned)).compactMap { WakeOnLAN.packet(mac: $0) }
-        guard !packets.isEmpty else { status = "CHECK MAC ADDRESS"; return }
+        guard !packets.isEmpty else { power.failWake(.missingAddress); return }
         UserDefaults.standard.set(mac, forKey: "tvMAC")
         disconnect()
-        waking = true; status = "WAKING"
+        power.startWake()
+        let wakeToken = wakeGeneration
         wakeTask = Task { [weak self] in
             guard let self else { return }
-            for _ in 0..<8 {
+            defer { if self.wakeGeneration == wakeToken { self.wakeTask = nil } }
+            for attempt in 1...8 {
                 guard !Task.isCancelled else { return }
+                self.power.attempt(attempt)
                 let sent = packets.map { WakeOnLAN.send(packet: $0, host: self.host) }.contains(true)
                 guard sent else {
-                    self.waking = false; self.status = "WAKE SEND FAILED"; return
+                    self.power.failWake(.sendFailed); return
                 }
                 self.connect()
-                if !self.isTVOn { self.status = "WAKING" }
                 try? await Task.sleep(for: .seconds(4))
                 guard !Task.isCancelled else { return }
-                if self.isTVOn { self.waking = false; return }
+                if self.isTVOn { self.power.finishWake(); return }
             }
             self.disconnect(stopWake: false)
-            self.waking = false; self.status = "TV DID NOT WAKE"
+            self.power.failWake(.timedOut)
         }
     }
-    func powerOff() { request("system/turnOff"); isTVOn = false; status = "TURNING OFF" }
+    func powerOff() { request("system/turnOff"); power.turnOff(); commandNotice = nil }
     private var keyQuery: [String: Any] {
         [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "is.chad.remote.v3", kSecAttrAccount as String: host]
     }

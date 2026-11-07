@@ -12,6 +12,7 @@
 		434A4098DF05C83775C0320A /* TVSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26C1B9863B1BFB06A3BCBF7 /* TVSettingsView.swift */; };
 		4C3A03A93F8812C4ED324D1D /* CursorPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 352A17F40F901E6BE77DF796 /* CursorPad.swift */; };
 		5194A49C0678ED2C273A2293 /* RimokonApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43F8FC300077AA67164240D2 /* RimokonApp.swift */; };
+		714506392E4CF53D17EAA830 /* TVStates.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4C63E829352AA08206CAC7 /* TVStates.swift */; };
 		A5BF6C4431C2578B6015944C /* TVNetworkInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93BFE774DCACDC0111074726 /* TVNetworkInfo.swift */; };
 		B664C06A1EDA8035347610B3 /* TV.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D0E89AEC7738519603A5AE /* TV.swift */; };
 		BC9E3A81540643312CBBB259 /* TVConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F27C93EB5EE572AF10EFA6 /* TVConfiguration.swift */; };
@@ -33,6 +34,7 @@
 		AF48E7D74C4837E9E5BB4121 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B4AAD91F189A02D6DC9F9F63 /* TVPowerState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVPowerState.swift; sourceTree = "<group>"; };
 		C26C1B9863B1BFB06A3BCBF7 /* TVSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVSettingsView.swift; sourceTree = "<group>"; };
+		CB4C63E829352AA08206CAC7 /* TVStates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVStates.swift; sourceTree = "<group>"; };
 		E0D0E89AEC7738519603A5AE /* TV.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TV.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -51,6 +53,7 @@
 				93BFE774DCACDC0111074726 /* TVNetworkInfo.swift */,
 				B4AAD91F189A02D6DC9F9F63 /* TVPowerState.swift */,
 				C26C1B9863B1BFB06A3BCBF7 /* TVSettingsView.swift */,
+				CB4C63E829352AA08206CAC7 /* TVStates.swift */,
 				AE1176569311C93E087D7C8F /* WakeOnLAN.swift */,
 			);
 			path = Rimokon;
@@ -138,6 +141,7 @@
 				A5BF6C4431C2578B6015944C /* TVNetworkInfo.swift in Sources */,
 				C3BDBAD11E3E992EE215B76A /* TVPowerState.swift in Sources */,
 				434A4098DF05C83775C0320A /* TVSettingsView.swift in Sources */,
+				714506392E4CF53D17EAA830 /* TVStates.swift in Sources */,
 				C84B00CB26A041F6305A40B2 /* TrackpadDelta.swift in Sources */,
 				24F7DE0FB4B733DEF84C62A9 /* TrackpadMode.swift in Sources */,
 				06C75D812544FFDF5FA48C5F /* WakeOnLAN.swift in Sources */,

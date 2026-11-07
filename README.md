@@ -1,37 +1,28 @@
 # Rimokon
 
-A native iPhone remote for LG webOS TVs. SwiftUI, iOS 17+, no external dependencies.
+A minimal iPhone remote for LG webOS TVs. iOS 17+, no external dependencies.
 
-## Use
+<img src="docs/rimokon.png" alt="Rimokon’s dark remote interface with a large touchpad and power, mute, navigation, volume, and channel controls" width="320">
 
-Swipe the trackpad to navigate; longer swipes move through more items. Tap for OK. Enable **Cursor mode** in settings to move the TV pointer with your finger instead.
+## Setup
 
-Buttons provide power, mute, Back, Home, TV settings, volume, and channels. The small circle between power and mute opens Rimokon settings. No motion sensors are used.
+1. Connect your iPhone and TV to the same network.
+2. Enter the TV’s IP address in Rimokon settings (the small circle between power and mute).
+3. Allow local-network access and accept pairing on the TV. Rimokon retrieves the MAC address automatically.
 
-The phone and TV must share a local network. Allow local-network access and accept the TV pairing prompt. On first launch, enter the TV’s IPv4 address in the configuration form. After pairing, Rimokon requests the TV’s network information and saves its wired/Wi-Fi MAC addresses for power on. Older pairings may need one additional TV approval for network-info permission. A manual MAC override remains under Power-on settings. Both values are stored locally on the phone; no network addresses are bundled with the app. Existing installations retain their saved configuration. Pairing credentials remain in the iOS Keychain and are not included in the repository.
+For power-on support, enable **Mobile TV On / Turn on via Wi-Fi** on the TV. Wake-up depends on the TV remaining reachable in standby. A manual MAC override is available in settings.
 
-Power uses the TV's reported state, rather than network connectivity, to distinguish on from standby. Wake-on-LAN requires **Mobile TV On / Turn on via Wi-Fi**. Wake uses unicast UDP and depends on the TV retaining network reachability in standby. Wake reliability depends on the TV and network, especially after extended standby.
+## Controls
 
-Communication uses the TV's local WebSocket interface on port 3000. There are no cloud services or analytics. Automatic discovery is not implemented.
+Swipe to navigate; longer swipes move through more items. Tap for OK. Enable **Cursor mode** in settings for direct pointer control.
 
-## Build and install
+## Development
 
-Open `Rimokon.xcodeproj`, select your development team under Signing & Capabilities, choose your iPhone, and Run. The bundle identifier remains `is.chad.Remote` to preserve the existing installation and pairing credentials.
+Open `Rimokon.xcodeproj`, select your signing team and iPhone, and Run. Run `xcodegen generate` after editing `project.yml`.
 
-```sh
-xcodebuild -project Rimokon.xcodeproj -scheme Rimokon -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
-```
-
-`project.yml` is the XcodeGen source. Run `xcodegen generate` after changing it.
-
-## Regression checks
+Standalone regression checks live in `Tests/`; compile each with its corresponding source files. For example:
 
 ```sh
-swiftc Rimokon/TVConfiguration.swift Rimokon/TVNetworkInfo.swift Tests/NetworkInfoRegression.swift -o /tmp/rimokon-network && /tmp/rimokon-network
-swiftc Rimokon/TVConfiguration.swift Tests/ConfigurationRegression.swift -o /tmp/rimokon-config && /tmp/rimokon-config
-swiftc Rimokon/TrackpadMode.swift Tests/AppModeRegression.swift -o /tmp/rimokon-swipes && /tmp/rimokon-swipes
-swiftc Rimokon/TrackpadDelta.swift Tests/TrackpadRegression.swift -o /tmp/rimokon-trackpad && /tmp/rimokon-trackpad
-swiftc Rimokon/TVPowerState.swift Tests/PowerRegression.swift -o /tmp/rimokon-power && /tmp/rimokon-power
+swiftc Rimokon/TVStates.swift Tests/RecoveryRegression.swift -o /tmp/rimokon-recovery
+/tmp/rimokon-recovery
 ```
-
-Configuration changes are saved with **Save & connect**; dismissing the form does not change the TV configuration. Pairing keeps the existing Keychain namespace.
