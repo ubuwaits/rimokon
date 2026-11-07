@@ -8,7 +8,7 @@ Swipe the trackpad to navigate; longer swipes move through more items. Tap for O
 
 Buttons provide power, mute, Back, Home, TV settings, volume, and channels. The small circle between power and mute opens Rimokon settings. No motion sensors are used.
 
-The phone and TV must share a local network. Allow local-network access and accept the TV pairing prompt. On first launch, enter the TV’s IPv4 address in the configuration form. Its MAC address is optional and needed only for power on. Both values are stored locally on the phone; no network addresses are bundled with the app. Existing installations retain their saved configuration. Pairing credentials remain in the iOS Keychain and are not included in the repository.
+The phone and TV must share a local network. Allow local-network access and accept the TV pairing prompt. On first launch, enter the TV’s IPv4 address in the configuration form. After pairing, Rimokon requests the TV’s network information and saves its wired/Wi-Fi MAC addresses for power on. Older pairings may need one additional TV approval for network-info permission. A manual MAC override remains under Power-on settings. Both values are stored locally on the phone; no network addresses are bundled with the app. Existing installations retain their saved configuration. Pairing credentials remain in the iOS Keychain and are not included in the repository.
 
 Power uses the TV's reported state, rather than network connectivity, to distinguish on from standby. Wake-on-LAN requires **Mobile TV On / Turn on via Wi-Fi**. Wake uses unicast UDP and depends on the TV retaining network reachability in standby. Wake reliability depends on the TV and network, especially after extended standby.
 

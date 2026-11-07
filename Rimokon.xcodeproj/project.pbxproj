@@ -12,6 +12,7 @@
 		434A4098DF05C83775C0320A /* TVSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26C1B9863B1BFB06A3BCBF7 /* TVSettingsView.swift */; };
 		4C3A03A93F8812C4ED324D1D /* CursorPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 352A17F40F901E6BE77DF796 /* CursorPad.swift */; };
 		5194A49C0678ED2C273A2293 /* RimokonApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43F8FC300077AA67164240D2 /* RimokonApp.swift */; };
+		A5BF6C4431C2578B6015944C /* TVNetworkInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93BFE774DCACDC0111074726 /* TVNetworkInfo.swift */; };
 		B664C06A1EDA8035347610B3 /* TV.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D0E89AEC7738519603A5AE /* TV.swift */; };
 		BC9E3A81540643312CBBB259 /* TVConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F27C93EB5EE572AF10EFA6 /* TVConfiguration.swift */; };
 		C3BDBAD11E3E992EE215B76A /* TVPowerState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4AAD91F189A02D6DC9F9F63 /* TVPowerState.swift */; };
@@ -24,6 +25,7 @@
 		352A17F40F901E6BE77DF796 /* CursorPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorPad.swift; sourceTree = "<group>"; };
 		43F8FC300077AA67164240D2 /* RimokonApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimokonApp.swift; sourceTree = "<group>"; };
 		7306B24F131E36D646E69C08 /* Rimokon.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Rimokon.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		93BFE774DCACDC0111074726 /* TVNetworkInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVNetworkInfo.swift; sourceTree = "<group>"; };
 		948AC20E653EF100FB3B821A /* TrackpadDelta.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackpadDelta.swift; sourceTree = "<group>"; };
 		A49D356794129789A90809E8 /* TrackpadMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackpadMode.swift; sourceTree = "<group>"; };
 		A7F27C93EB5EE572AF10EFA6 /* TVConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVConfiguration.swift; sourceTree = "<group>"; };
@@ -46,6 +48,7 @@
 				A49D356794129789A90809E8 /* TrackpadMode.swift */,
 				E0D0E89AEC7738519603A5AE /* TV.swift */,
 				A7F27C93EB5EE572AF10EFA6 /* TVConfiguration.swift */,
+				93BFE774DCACDC0111074726 /* TVNetworkInfo.swift */,
 				B4AAD91F189A02D6DC9F9F63 /* TVPowerState.swift */,
 				C26C1B9863B1BFB06A3BCBF7 /* TVSettingsView.swift */,
 				AE1176569311C93E087D7C8F /* WakeOnLAN.swift */,
@@ -132,6 +135,7 @@
 				CA9A6A39DC630FBF41C92014 /* SurfaceGrain.swift in Sources */,
 				B664C06A1EDA8035347610B3 /* TV.swift in Sources */,
 				BC9E3A81540643312CBBB259 /* TVConfiguration.swift in Sources */,
+				A5BF6C4431C2578B6015944C /* TVNetworkInfo.swift in Sources */,
 				C3BDBAD11E3E992EE215B76A /* TVPowerState.swift in Sources */,
 				434A4098DF05C83775C0320A /* TVSettingsView.swift in Sources */,
 				C84B00CB26A041F6305A40B2 /* TrackpadDelta.swift in Sources */,

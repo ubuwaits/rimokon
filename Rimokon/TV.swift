@@ -4,6 +4,8 @@ import Security
 @MainActor final class TV: ObservableObject {
     @Published var host = TVConfiguration.load().host
     @Published var mac = TVConfiguration.load().mac
+    @Published var macStatus = ""
+    private var upgradingNetworkPermission = false
     @Published var waking = false
     private var wakeTask: Task<Void, Never>?
     @Published var status = "OFFLINE"
@@ -29,8 +31,9 @@ import Security
         connect()
     }
 
-    func connect() {
+    func connect(requestNetworkPermission: Bool = false) {
         disconnect(stopWake: false)
+        upgradingNetworkPermission = requestNetworkPermission
         let configuration = TVConfiguration(host: host, mac: mac)
         guard configuration.validHost,
               let url = URL(string: "ws://\(configuration.host):3000") else {
@@ -45,13 +48,14 @@ import Security
         socket = task
         task.resume()
         receive(task, token: token)
-        var payload: [String: Any] = ["pairingType": "PROMPT", "forcePairing": false,
-            "manifest": ["manifestVersion": 1, "appVersion": "1.0", "permissions": ["READ_AUDIO_VOLUME", "CONTROL_AUDIO", "CONTROL_INPUT_JOYSTICK", "CONTROL_MOUSE_AND_KEYBOARD", "CONTROL_INPUT_MEDIA_PLAYBACK", "CONTROL_INPUT_TV", "LAUNCH", "CONTROL_POWER"]]]
-        if let key = storedKey() { payload["client-key"] = key }
+        var payload: [String: Any] = ["pairingType": "PROMPT", "forcePairing": requestNetworkPermission,
+            "manifest": ["manifestVersion": 1, "appVersion": "1.0", "permissions": ["READ_NETWORK_STATE", "READ_AUDIO_VOLUME", "CONTROL_AUDIO", "CONTROL_INPUT_JOYSTICK", "CONTROL_MOUSE_AND_KEYBOARD", "CONTROL_INPUT_MEDIA_PLAYBACK", "CONTROL_INPUT_TV", "LAUNCH", "CONTROL_POWER"]]]
+        if !requestNetworkPermission, let key = storedKey() { payload["client-key"] = key }
         send(["id": "register", "type": "register", "payload": payload])
         timeout = Task { [weak self] in
             try? await Task.sleep(for: .seconds(60))
             guard !Task.isCancelled, let self, self.generation == token, !self.connected else { return }
+            if self.upgradingNetworkPermission { self.connect(); self.macStatus = "MAC permission not granted"; return }
             self.disconnect(); self.status = "CONNECTION TIMED OUT"
         }
     }
@@ -74,6 +78,7 @@ import Security
                 guard let self, self.generation == token else { return }
                 switch result {
                 case .failure:
+                    if self.upgradingNetworkPermission { self.connect(); return }
                     self.disconnect(stopWake: false); self.status = self.waking ? "WAKING" : "TV UNREACHABLE"
                 case .success(let message):
                     let data: Data
@@ -94,13 +99,36 @@ import Security
         let id = message["id"] as? String
         let payload = message["payload"] as? [String: Any] ?? [:]
         if type == "registered" {
+            upgradingNetworkPermission = false
             if let key = payload["client-key"] as? String { saveKey(key) }
             timeout?.cancel(); connected = true; status = "CONNECTED"
             send(["id": "volume", "type": "subscribe", "uri": "ssap://audio/getVolume"])
             request("com.webos.service.networkinput/getPointerInputSocket", id: "pointer")
             send(["id": "power", "type": "subscribe", "uri": "ssap://com.webos.service.tvpower/power/getPowerState"])
+            macStatus = "Reading MAC address…"
+            request("com.webos.service.connectionmanager/getinfo", id: "networkInfo")
             monitorConnection()
         } else if id == "register", payload["pairingType"] != nil { status = "ACCEPT ON TV" }
+        if id == "networkInfo" {
+            if type == "error" {
+                macStatus = "Automatic MAC unavailable; saved address kept"
+                let attempted = UserDefaults.standard.stringArray(forKey: "networkPermissionAttemptedHosts") ?? []
+                if (message["error"] as? String)?.hasPrefix("401") == true, !attempted.contains(host) {
+                    refreshMACPermission()
+                }
+            } else {
+                let learned = TVNetworkInfo.macAddresses(from: payload, host: host)
+                if !learned.isEmpty {
+                    var cache = UserDefaults.standard.dictionary(forKey: "learnedTVMACs") as? [String: [String]] ?? [:]
+                    cache[host] = learned
+                    UserDefaults.standard.set(cache, forKey: "learnedTVMACs")
+                    if mac.isEmpty { mac = learned[0] }
+                    TVConfiguration(host: host, mac: mac).save()
+                    macStatus = "MAC retrieved automatically"
+                } else { macStatus = "Automatic MAC unavailable; saved address kept" }
+            }
+            return
+        }
         if id == "power", type != "error", let state = payload["state"] as? String {
             isTVOn = TVPowerState.isOn(state: state, processing: payload["processing"] as? String)
             if isTVOn { status = "CONNECTED" }
@@ -115,7 +143,10 @@ import Security
             pointer = URLSession.shared.webSocketTask(with: url); pointer?.resume(); navigationReady = true; status = "CONNECTED"
         }
         if type == "error" {
-            if id == "register" { disconnect(); status = "PAIRING REJECTED" }
+            if id == "register" {
+                if upgradingNetworkPermission { connect(); macStatus = "MAC permission not granted" }
+                else { disconnect(); status = "PAIRING REJECTED" }
+            }
             else { status = "COMMAND FAILED" }
         }
     }
@@ -207,9 +238,18 @@ import Security
         }
     }
 
+    func refreshMACPermission() {
+        var attempted = UserDefaults.standard.stringArray(forKey: "networkPermissionAttemptedHosts") ?? []
+        if !attempted.contains(host) { attempted.append(host) }
+        UserDefaults.standard.set(attempted, forKey: "networkPermissionAttemptedHosts")
+        connect(requestNetworkPermission: true)
+    }
+
     func powerOn() {
         guard !waking else { return }
-        guard let packet = WakeOnLAN.packet(mac: mac) else { status = "CHECK MAC ADDRESS"; return }
+        let learned = (UserDefaults.standard.dictionary(forKey: "learnedTVMACs") as? [String: [String]])?[host] ?? []
+        let packets = Array(Set([mac] + learned)).compactMap { WakeOnLAN.packet(mac: $0) }
+        guard !packets.isEmpty else { status = "CHECK MAC ADDRESS"; return }
         UserDefaults.standard.set(mac, forKey: "tvMAC")
         disconnect()
         waking = true; status = "WAKING"
@@ -217,7 +257,8 @@ import Security
             guard let self else { return }
             for _ in 0..<8 {
                 guard !Task.isCancelled else { return }
-                guard WakeOnLAN.send(packet: packet, host: self.host) else {
+                let sent = packets.map { WakeOnLAN.send(packet: $0, host: self.host) }.contains(true)
+                guard sent else {
                     self.waking = false; self.status = "WAKE SEND FAILED"; return
                 }
                 self.connect()

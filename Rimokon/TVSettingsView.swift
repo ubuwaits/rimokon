@@ -21,21 +21,32 @@ struct TVSettingsView: View {
                 Section {
                     TextField("TV IP address", text: $host).keyboardType(.decimalPad).autocorrectionDisabled()
                         .accessibilityLabel("TV IP address")
-                    TextField("MAC address (optional)", text: $mac).textInputAutocapitalization(.never).autocorrectionDisabled()
-                        .accessibilityLabel("TV MAC address")
+
                 } footer: {
-                    Text("Find these in your TV’s network settings. The MAC address enables power on.")
+                    Text("Enter the IP from your TV’s network settings. The wake address is retrieved after pairing.")
                 }
                 Button("Save & connect") {
                     tv.configure(configuration)
                     dismiss()
                 }.disabled(!configuration.valid)
+                DisclosureGroup("Power-on settings") {
+                    TextField("MAC address (automatic)", text: $mac).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .accessibilityLabel("TV MAC address")
+                    if !tv.macStatus.isEmpty { Text(tv.macStatus).font(.caption) }
+                    Button("Retrieve MAC again") { tv.refreshMACPermission() }.disabled(!tv.connected)
+                }
                 Toggle("Cursor mode", isOn: $cursorModeEnabled)
                 if !tv.status.isEmpty { Text(tv.status).font(.system(.caption, design: .monospaced)) }
             }
             .navigationTitle(tv.host.isEmpty ? "Set up TV" : "Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+        .onChange(of: tv.mac) { old, new in
+            if host == tv.host && mac == old { mac = new }
+        }
+        .onChange(of: host) { old, new in
+            if old != new { mac = new.trimmingCharacters(in: .whitespacesAndNewlines) == tv.host ? tv.mac : "" }
         }
         .presentationDetents([.medium, .large])
     }
