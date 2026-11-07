@@ -21,7 +21,6 @@ struct TVSettingsView: View {
                 Section {
                     TextField("TV IP address", text: $host).keyboardType(.decimalPad).autocorrectionDisabled()
                         .accessibilityLabel("TV IP address")
-
                 } footer: {
                     Text("Enter the IP from your TV’s network settings. The wake address is retrieved after pairing.")
                 }
@@ -45,8 +44,8 @@ struct TVSettingsView: View {
         .onChange(of: tv.mac) { old, new in
             if host == tv.host && mac == old { mac = new }
         }
-        .onChange(of: host) { old, new in
-            if old != new { mac = new.trimmingCharacters(in: .whitespacesAndNewlines) == tv.host ? tv.mac : "" }
+        .onChange(of: host) { _, new in
+            mac = new.trimmingCharacters(in: .whitespacesAndNewlines) == tv.host ? tv.mac : ""
         }
         .presentationDetents([.medium, .large])
     }

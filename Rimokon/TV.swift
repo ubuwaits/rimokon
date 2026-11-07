@@ -2,8 +2,8 @@ import Foundation
 import Security
 
 @MainActor final class TV: ObservableObject {
-    @Published var host = TVConfiguration.load().host
-    @Published var mac = TVConfiguration.load().mac
+    @Published var host: String
+    @Published var mac: String
     @Published var macStatus = ""
     private var upgradingNetworkPermission = false
     @Published var waking = false
@@ -12,7 +12,6 @@ import Security
     @Published var connected = false
     @Published var isTVOn = false
     @Published var navigationReady = false
-    @Published var volume: Int?
     @Published var muted = false
     private var socket: URLSessionWebSocketTask?
     private var pointer: URLSessionWebSocketTask?
@@ -21,6 +20,12 @@ import Security
     private var timeout: Task<Void, Never>?
     private var generation = UUID()
     private var serial = 0
+
+    init() {
+        let configuration = TVConfiguration.load()
+        host = configuration.host
+        mac = configuration.mac
+    }
 
     func configure(_ configuration: TVConfiguration) {
         guard configuration.valid else { return }
@@ -69,7 +74,7 @@ import Security
         cursorSendInFlight = false
         navigationReady = false
         isTVOn = false
-        connected = false; volume = nil; status = "OFFLINE"
+        connected = false; status = "OFFLINE"
     }
 
     private func receive(_ task: URLSessionWebSocketTask, token: UUID) {
@@ -135,7 +140,6 @@ import Security
             else if !waking { status = "STANDBY" }
         }
         if id == "volume" {
-            volume = payload["volume"] as? Int
             muted = payload["muted"] as? Bool ?? false
         }
         if id == "pointer", let path = payload["socketPath"] as? String, let url = URL(string: path), url.host == host {
@@ -169,13 +173,7 @@ import Security
     }
     func button(_ name: String) {
         guard connected, let pointer else { status = "CONTROLS NOT READY"; return }
-        let token = generation
-        pointer.send(.string("type:button\nname:\(name)\n\n")) { [weak self] error in
-            if error != nil { Task { @MainActor in
-                guard let self, self.generation == token else { return }
-                self.recoverPointer(pointer)
-            } }
-        }
+        sendInput("type:button\nname:\(name)\n\n", to: pointer)
     }
     func moveCursor(dx: Int, dy: Int) {
         guard navigationReady, !cursorSendInFlight, let pointer else { return }
@@ -192,8 +190,12 @@ import Security
 
     func clickCursor() {
         guard navigationReady, let pointer else { return }
+        sendInput("type:click\n\n", to: pointer)
+    }
+
+    private func sendInput(_ command: String, to pointer: URLSessionWebSocketTask) {
         let token = generation
-        pointer.send(.string("type:click\n\n")) { [weak self] error in
+        pointer.send(.string(command)) { [weak self] error in
             if error != nil { Task { @MainActor in
                 guard let self, self.generation == token else { return }
                 self.recoverPointer(pointer)

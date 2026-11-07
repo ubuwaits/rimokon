@@ -69,7 +69,7 @@ private final class PadView: UIView {
     }
     func setMode(_ next: TrackpadMode) {
         guard mode != next else { return }
-        // Cancel an in-progress gesture so it cannot select in a different app.
+        // Cancel an in-progress gesture before switching input modes.
         let wasEnabled = pan.isEnabled
         pan.isEnabled = false; tap.isEnabled = false
         finish(); mode = next

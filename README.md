@@ -27,6 +27,7 @@ xcodebuild -project Rimokon.xcodeproj -scheme Rimokon -sdk iphonesimulator -conf
 ## Regression checks
 
 ```sh
+swiftc Rimokon/TVConfiguration.swift Rimokon/TVNetworkInfo.swift Tests/NetworkInfoRegression.swift -o /tmp/rimokon-network && /tmp/rimokon-network
 swiftc Rimokon/TVConfiguration.swift Tests/ConfigurationRegression.swift -o /tmp/rimokon-config && /tmp/rimokon-config
 swiftc Rimokon/TrackpadMode.swift Tests/AppModeRegression.swift -o /tmp/rimokon-swipes && /tmp/rimokon-swipes
 swiftc Rimokon/TrackpadDelta.swift Tests/TrackpadRegression.swift -o /tmp/rimokon-trackpad && /tmp/rimokon-trackpad

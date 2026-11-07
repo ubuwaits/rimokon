@@ -7,7 +7,6 @@ import SwiftUI
 enum RimokonPalette {
     static let background = Color(white: 16.5 / 255)
     static let surface = Color(white: 30.5 / 255)
-    static let edge = Color(white: 73.0 / 255)
     static let text = Color(white: 237.0 / 255)
     static let buttonTop = Color(white: 56.2 / 255)
     static let buttonBottom = Color(white: 42.3 / 255)
@@ -65,7 +64,7 @@ struct RimokonView: View {
                     }
                 }
                 .frame(height: max(geometry.size.height - 40, 544))
-                .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 20)
+                .padding(20)
                 .frame(maxWidth: 430)
                 .frame(maxWidth: .infinity)
             }.scrollIndicators(.hidden)
@@ -110,7 +109,6 @@ struct RimokonView: View {
     private func key(_ symbol: String, _ label: String, selected: Bool = false, requiresConnection: Bool = true, action: @escaping () -> Void) -> some View {
         Button { feedback(); action() } label: {
             Image(systemName: symbol).font(.system(size: 19, weight: .medium))
-                .foregroundStyle(selected ? Color.white : RimokonPalette.text)
                 .frame(maxWidth: .infinity).frame(height: 48)
         }.buttonStyle(RimokonKey(selected: selected)).disabled(requiresConnection && !tv.connected).accessibilityLabel(label)
     }
