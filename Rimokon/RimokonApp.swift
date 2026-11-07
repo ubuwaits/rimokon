@@ -72,7 +72,13 @@ struct RimokonView: View {
         .foregroundStyle(RimokonPalette.text).background { RimokonPalette.background.overlay(SurfaceGrain()).ignoresSafeArea() }
         .preferredColorScheme(.dark)
         .tint(RimokonPalette.text)
-        .sheet(isPresented: $settings) {
+        .sheet(isPresented: $settings, onDismiss: {
+            guard phase == .active, !tv.host.isEmpty else { return }
+            switch tv.connection {
+            case .offline, .failed: tv.connect()
+            default: break
+            }
+        }) {
             TVSettingsView(tv: tv, cursorModeEnabled: $cursorModeEnabled)
         }
 
@@ -80,7 +86,7 @@ struct RimokonView: View {
             Button("Turn off", role: .destructive) { tv.powerOff() }
         }
         .onChange(of: phase) { _, value in
-            if value == .active && !settings && !tv.host.isEmpty { tv.connect() }
+            if value == .active && !tv.host.isEmpty { tv.connect() }
             else if value == .background { tv.disconnect() }
         }
         .task {
