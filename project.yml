@@ -1,0 +1,36 @@
+name: Rimokon
+options:
+  bundleIdPrefix: is.chad
+  deploymentTarget:
+    iOS: '17.0'
+settings:
+  base:
+    PRODUCT_BUNDLE_IDENTIFIER: is.chad.Remote
+    INFOPLIST_KEY_CFBundleDisplayName: Rimokon
+    SWIFT_VERSION: '5.0'
+    TARGETED_DEVICE_FAMILY: '1'
+    GENERATE_INFOPLIST_FILE: YES
+    INFOPLIST_KEY_NSLocalNetworkUsageDescription: Connect to your LG TV on your home network.
+    INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
+    INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+    CODE_SIGN_STYLE: Automatic
+targets:
+  Rimokon:
+    type: application
+    platform: iOS
+    sources: [Rimokon]
+    info:
+      path: Rimokon/Info.plist
+      properties:
+        NSLocalNetworkUsageDescription: Connect to your LG TV on your home network.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+          NSAllowsArbitraryLoads: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+schemes:
+  Rimokon:
+    build:
+      targets:
+        Rimokon: all
