@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		06C75D812544FFDF5FA48C5F /* WakeOnLAN.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1176569311C93E087D7C8F /* WakeOnLAN.swift */; };
+		226F02E8E48637D821BAB816 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6147FD01066C7E874E567047 /* Assets.xcassets */; };
 		24F7DE0FB4B733DEF84C62A9 /* TrackpadMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = A49D356794129789A90809E8 /* TrackpadMode.swift */; };
 		434A4098DF05C83775C0320A /* TVSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26C1B9863B1BFB06A3BCBF7 /* TVSettingsView.swift */; };
 		4C3A03A93F8812C4ED324D1D /* CursorPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 352A17F40F901E6BE77DF796 /* CursorPad.swift */; };
@@ -25,6 +26,7 @@
 		00069CF8C559672235FABB49 /* SurfaceGrain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceGrain.swift; sourceTree = "<group>"; };
 		352A17F40F901E6BE77DF796 /* CursorPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorPad.swift; sourceTree = "<group>"; };
 		43F8FC300077AA67164240D2 /* RimokonApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimokonApp.swift; sourceTree = "<group>"; };
+		6147FD01066C7E874E567047 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7306B24F131E36D646E69C08 /* Rimokon.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Rimokon.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		93BFE774DCACDC0111074726 /* TVNetworkInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVNetworkInfo.swift; sourceTree = "<group>"; };
 		948AC20E653EF100FB3B821A /* TrackpadDelta.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackpadDelta.swift; sourceTree = "<group>"; };
@@ -42,6 +44,7 @@
 		33B724CB90D3F99FDCC99B18 /* Rimokon */ = {
 			isa = PBXGroup;
 			children = (
+				6147FD01066C7E874E567047 /* Assets.xcassets */,
 				352A17F40F901E6BE77DF796 /* CursorPad.swift */,
 				AF48E7D74C4837E9E5BB4121 /* Info.plist */,
 				43F8FC300077AA67164240D2 /* RimokonApp.swift */,
@@ -83,6 +86,7 @@
 			buildConfigurationList = 4000771D73AE5168E27D55F4 /* Build configuration list for PBXNativeTarget "Rimokon" */;
 			buildPhases = (
 				616CCD389FC47E031CF1CC25 /* Sources */,
+				60C56B70EF30BE05C7B9C43F /* Resources */,
 			);
 			buildRules = (
 			);
@@ -128,6 +132,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		60C56B70EF30BE05C7B9C43F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				226F02E8E48637D821BAB816 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		616CCD389FC47E031CF1CC25 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -170,6 +185,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -257,6 +273,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
