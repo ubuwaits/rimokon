@@ -53,7 +53,6 @@ struct TVSettingsView: View {
             }
             .navigationTitle(tv.host.isEmpty ? "Set up TV" : "Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
         .task { if tv.host.isEmpty && !tv.searching { tv.findTVs() } }
         .onChange(of: tv.host) { _, new in host = new; mac = tv.mac }
