@@ -19,10 +19,24 @@ struct TVSettingsView: View {
         NavigationStack {
             Form {
                 Section {
+                    Button(tv.searching ? "Searching…" : "Find TV") { tv.findTVs() }
+                        .disabled(tv.searching)
+                    ForEach(tv.discoveredTVs) { device in
+                        Button {
+                            tv.selectTV(device)
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Text(device.name)
+                                Spacer()
+                                Text(device.host).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                     TextField("TV IP address", text: $host).keyboardType(.decimalPad).autocorrectionDisabled()
                         .accessibilityLabel("TV IP address")
                 } footer: {
-                    Text("Enter the IP from your TV’s network settings. The wake address is retrieved after pairing.")
+                    Text("Turn the TV on to find it. You can also enter its IP address.")
                 }
                 Button("Save & connect") {
                     tv.configure(configuration)
@@ -41,6 +55,8 @@ struct TVSettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
+        .task { if tv.host.isEmpty && !tv.searching { tv.findTVs() } }
+        .onChange(of: tv.host) { _, new in host = new; mac = tv.mac }
         .onChange(of: tv.mac) { old, new in
             if host == tv.host && mac == old { mac = new }
         }
