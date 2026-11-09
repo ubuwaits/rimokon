@@ -35,8 +35,6 @@ struct TVSettingsView: View {
                     }
                     TextField("TV IP address", text: $host).keyboardType(.decimalPad).autocorrectionDisabled()
                         .accessibilityLabel("TV IP address")
-                } footer: {
-                    Text("Turn the TV on to find it. You can also enter its IP address.")
                 }
                 Button("Save & connect") {
                     tv.configure(configuration)
