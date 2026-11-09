@@ -4,12 +4,15 @@ import Security
 @MainActor final class TV: ObservableObject {
     @Published var host: String
     @Published var mac: String
+    @Published private(set) var name = UserDefaults.standard.string(forKey: "tvName") ?? "LG webOS TV"
     @Published private(set) var connection: ConnectionState = .offline
     @Published private(set) var navigation: NavigationState = .unavailable
     @Published private(set) var power = PowerState()
     @Published private(set) var macRetrieval: MACRetrievalState = .idle
     @Published private var commandNotice: String?
     @Published var muted = false
+    @Published private(set) var installedApps: [TVApp: String] = [:]
+    @Published private(set) var activeAppID: String?
     @Published private(set) var discoveredTVs: [DiscoveredTV] = []
     @Published private(set) var discoveryStatus = ""
     @Published private(set) var searching = false
@@ -36,6 +39,7 @@ import Security
         if connected && navigation == .recovering { return "RECONNECTING" }
         return connection.status
     }
+    private var reconnectTask: Task<Void, Never>?
     private var heartbeat: Task<Void, Never>?
     private var timeout: Task<Void, Never>?
     private var generation = UUID()
@@ -53,6 +57,7 @@ import Security
         if configuration.host != host {
             identity = nil
             UserDefaults.standard.removeObject(forKey: "tvIdentity")
+            saveName("LG webOS TV")
         }
         configuration.save()
         host = configuration.host
@@ -71,13 +76,22 @@ import Security
                 let found = try await TVDiscovery.scan()
                 guard let self, !Task.isCancelled, self.generation == token else { return }
                 self.discoveredTVs = found
-                self.discoveryStatus = found.isEmpty ? "No TVs found. Turn the TV on and try again." : ""
+                self.discoveryStatus = found.isEmpty ? "No TVs found" : ""
                 self.searching = false; self.discoveryTask = nil
             } catch {
                 guard let self, !Task.isCancelled, self.generation == token else { return }
                 self.discoveryFailed(error)
             }
         }
+    }
+
+    private func saveName(_ value: String) {
+        name = value
+        UserDefaults.standard.set(value, forKey: "tvName")
+    }
+
+    func isSelected(_ tv: DiscoveredTV) -> Bool {
+        identity.map { $0 == tv.id } ?? (host == tv.host)
     }
 
     func selectTV(_ tv: DiscoveredTV) {
@@ -87,6 +101,7 @@ import Security
             identity = nil
             UserDefaults.standard.removeObject(forKey: "tvIdentity")
         }
+        saveName(tv.name)
         host = tv.host
         TVConfiguration(host: host, mac: mac).save()
         connect()
@@ -95,8 +110,8 @@ import Security
     private func discoveryFailed(_ error: Error) {
         searching = false; discoveryTask = nil
         discoveryStatus = (error as? TVDiscovery.Failure) == .networkTooLarge
-            ? "Network too large to scan. Enter the TV IP address."
-            : "Connect to Wi-Fi and allow Local Network access."
+            ? "Network too large to scan"
+            : "Local network unavailable"
         connection = .failed(.unreachable)
     }
 
@@ -114,9 +129,14 @@ import Security
         let oldHost = host
         let expected = identity
         discoveryTask = Task { [weak self] in
-            var candidate = await TVDiscovery.probe(oldHost)
+            var candidate: DiscoveredTV?
+            if let expected {
+                candidate = await TVDiscovery.resolve(host: oldHost, identity: expected)
+            } else {
+                candidate = await TVDiscovery.probe(oldHost)
+            }
             guard let self, !Task.isCancelled, self.generation == token else { return }
-            if candidate == nil || (expected != nil && candidate?.id != expected) {
+            if candidate == nil && expected == nil {
                 self.searching = true; self.discoveryStatus = "Searching…"
                 do {
                     let found = try await TVDiscovery.scan(matching: expected)
@@ -131,7 +151,7 @@ import Security
             }
             self.searching = false; self.discoveryTask = nil
             guard let candidate else {
-                self.discoveryStatus = self.discoveredTVs.isEmpty ? "No TV found. Turn it on and try again." : "Choose your TV in settings."
+                self.discoveryStatus = self.discoveredTVs.isEmpty ? "TV not found" : "Select TV"
                 self.connection = .failed(.unreachable); return
             }
             self.discoveryStatus = ""
@@ -150,6 +170,7 @@ import Security
                 UserDefaults.standard.set(attempted, forKey: "networkPermissionAttemptedHosts")
             }
         }
+        saveName(tv.name)
         host = tv.host
         TVConfiguration(host: host, mac: mac).save()
         pendingIdentity = tv.id
@@ -174,13 +195,14 @@ import Security
     private func register() {
         let requestNetworkPermission = permissionRequested
         var payload: [String: Any] = ["pairingType": "PROMPT", "forcePairing": requestNetworkPermission,
-            "manifest": ["manifestVersion": 1, "appVersion": "1.0", "permissions": ["READ_NETWORK_STATE", "READ_AUDIO_VOLUME", "CONTROL_AUDIO", "CONTROL_INPUT_JOYSTICK", "CONTROL_MOUSE_AND_KEYBOARD", "CONTROL_INPUT_MEDIA_PLAYBACK", "CONTROL_INPUT_TV", "LAUNCH", "CONTROL_POWER"]]]
+            "manifest": ["manifestVersion": 1, "appVersion": "1.0", "permissions": ["READ_INSTALLED_APPS", "READ_RUNNING_APPS", "READ_NETWORK_STATE", "READ_AUDIO_VOLUME", "CONTROL_AUDIO", "CONTROL_INPUT_JOYSTICK", "CONTROL_MOUSE_AND_KEYBOARD", "CONTROL_INPUT_MEDIA_PLAYBACK", "CONTROL_INPUT_TV", "LAUNCH", "CONTROL_POWER"]]]
         if !requestNetworkPermission, let key = storedKey() { payload["client-key"] = key }
         send(["id": "register", "type": "register", "payload": payload])
     }
 
     func disconnect(stopWake: Bool = true) {
         if stopWake { wakeGeneration = UUID(); wakeTask?.cancel(); wakeTask = nil }
+        reconnectTask?.cancel(); reconnectTask = nil
         discoveryTask?.cancel(); discoveryTask = nil
         searching = false; discoveryStatus = ""
         pendingIdentity = nil
@@ -189,10 +211,24 @@ import Security
         socket?.cancel(with: .goingAway, reason: nil); socket = nil
         pointer?.cancel(with: .goingAway, reason: nil); pointer = nil
         navigation = .unavailable
+        activeAppID = nil
+        installedApps = [:]
         power.disconnected(cancelWake: stopWake)
         macRetrieval.disconnected()
         connection = .offline
         commandNotice = nil
+    }
+
+    private func connectionLost() {
+        disconnect(stopWake: false)
+        connection = .failed(.unreachable)
+        guard identity != nil else { return }
+        let token = generation
+        reconnectTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled, let self, self.generation == token else { return }
+            self.connect()
+        }
     }
 
     private func receive(_ task: URLSessionWebSocketTask, token: UUID) {
@@ -202,7 +238,7 @@ import Security
                 switch result {
                 case .failure:
                     if self.connection.upgradingPermission { self.connect(); return }
-                    self.disconnect(stopWake: false); self.connection = .failed(.unreachable)
+                    self.connectionLost()
                 case .success(let message):
                     let data: Data
                     switch message {
@@ -238,11 +274,33 @@ import Security
             timeout?.cancel(); timeout = nil; connection = .connected; commandNotice = nil
             send(["id": "volume", "type": "subscribe", "uri": "ssap://audio/getVolume"])
             requestPointer()
+            request("com.webos.applicationManager/listApps", id: "apps")
+            send(["id": "foreground", "type": "subscribe", "uri": "ssap://com.webos.applicationManager/getForegroundAppInfo"])
             send(["id": "power", "type": "subscribe", "uri": "ssap://com.webos.service.tvpower/power/getPowerState"])
             macRetrieval = .reading
             request("com.webos.service.connectionmanager/getinfo", id: "networkInfo")
             monitorConnection()
         } else if id == "register", payload["pairingType"] != nil { connection.awaitApproval() }
+        if id == "apps" || id == "foreground" {
+            if type == "error" || payload["returnValue"] as? Bool == false {
+                if id == "foreground" { activeAppID = nil }
+                // Upgrade old pairing permissions once, without disturbing saved keys.
+                let account = identity ?? host
+                var attempted = UserDefaults.standard.stringArray(forKey: "appPermissionAttemptedTVs") ?? []
+                if (message["error"] as? String)?.hasPrefix("401") == true, !attempted.contains(account) {
+                    attempted.append(account)
+                    UserDefaults.standard.set(attempted, forKey: "appPermissionAttemptedTVs")
+                    connect(requestNetworkPermission: true)
+                }
+            } else if id == "apps", let apps = payload["apps"] as? [[String: Any]] {
+                installedApps = Dictionary(uniqueKeysWithValues: TVApp.allCases.compactMap { app in
+                    app.installedID(in: apps).map { (app, $0) }
+                })
+            } else if id == "foreground" {
+                activeAppID = payload["appId"] as? String
+            }
+            return
+        }
         if id == "networkInfo" {
             if type == "error" {
                 macRetrieval = .unavailable
@@ -289,7 +347,7 @@ import Security
         socket?.send(.string(text)) { [weak self] error in
             if error != nil { Task { @MainActor in
                 guard let self, self.generation == token else { return }
-                self.disconnect(stopWake: false); self.connection = .failed(.unreachable)
+                self.connectionLost()
             } }
         }
     }
@@ -299,6 +357,12 @@ import Security
         serial += 1
         send(["id": id ?? "cmd\(serial)", "type": "request", "uri": "ssap://\(uri)", "payload": payload])
     }
+    func launch(_ app: TVApp) {
+        guard connected, let id = installedApps[app] else { return }
+        request("system.launcher/launch", payload: ["id": id])
+        // Highlight only the foreground app reported by the TV, never a pending launch.
+    }
+
     func button(_ name: String) {
         guard connected, let pointer else { commandNotice = "CONTROLS NOT READY"; return }
         sendInput("type:button\nname:\(name)\n\n", to: pointer)
@@ -391,7 +455,7 @@ import Security
             guard let self else { return }
             defer { if self.wakeGeneration == wakeToken { self.wakeTask = nil } }
             var sentAny = false
-            for attempt in 1...8 {
+            for attempt in 1...30 {
                 guard !Task.isCancelled else { return }
                 self.power.attempt(attempt)
                 let sent = packets.map { WakeOnLAN.send(packet: $0, host: self.host) }.contains(true)
@@ -407,7 +471,7 @@ import Security
                 guard !Task.isCancelled else { return }
                 if self.isTVOn { self.power.finishWake(); return }
             }
-            self.disconnect(stopWake: false)
+            // Keep any connection/pairing attempt alive after wake packets stop.
             self.power.failWake(sentAny ? .timedOut : .sendFailed)
         }
     }

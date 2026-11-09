@@ -50,6 +50,21 @@ struct RimokonView: View {
                             key("gearshape", "TV settings") { tv.button("MENU") }
                         }
                         HStack(spacing: 12) {
+                            ForEach(TVApp.allCases) { app in
+                                let selected = tv.activeAppID != nil && tv.activeAppID == tv.installedApps[app]
+                                Button { feedback(); tv.launch(app) } label: {
+                                    Text(app.rawValue)
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .lineLimit(1)
+                                        .frame(maxWidth: .infinity).frame(height: 48)
+                                }
+                                .buttonStyle(RimokonKey(selected: selected))
+                                .disabled(!tv.connected || tv.installedApps[app] == nil)
+                                .accessibilityLabel("Open " + app.rawValue)
+                                .accessibilityAddTraits(selected ? .isSelected : [])
+                            }
+                        }
+                        HStack(spacing: 12) {
                             VStack(spacing: 8) {
                                 key("plus", "Volume up") { tv.request("audio/volumeUp") }
                                 controlLabel("VOL")

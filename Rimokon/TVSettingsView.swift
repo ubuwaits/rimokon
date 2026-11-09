@@ -19,8 +19,17 @@ struct TVSettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    Button(tv.searching ? "Searching…" : "Find TV") { tv.findTVs() }
-                        .disabled(tv.searching)
+                    if !tv.host.isEmpty {
+                        HStack {
+                            Text(tv.name)
+                            Spacer()
+                            Text(tv.status).font(.caption).foregroundStyle(.secondary)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+                    Button(tv.searching ? "Searching…" : (tv.host.isEmpty ? "Find TV" : "Find another TV")) {
+                        tv.findTVs()
+                    }.disabled(tv.searching)
                     ForEach(tv.discoveredTVs) { device in
                         Button {
                             tv.selectTV(device)
@@ -30,24 +39,26 @@ struct TVSettingsView: View {
                                 Text(device.name)
                                 Spacer()
                                 Text(device.host).foregroundStyle(.secondary)
+                                if tv.isSelected(device) { Image(systemName: "checkmark") }
                             }
                         }
                     }
-                    TextField("TV IP address", text: $host).keyboardType(.decimalPad).autocorrectionDisabled()
-                        .accessibilityLabel("TV IP address")
-                }
-                Button("Save & connect") {
-                    tv.configure(configuration)
-                    dismiss()
-                }.disabled(!configuration.valid)
-                DisclosureGroup("Power-on settings") {
-                    TextField("MAC address (automatic)", text: $mac).textInputAutocapitalization(.never).autocorrectionDisabled()
-                        .accessibilityLabel("TV MAC address")
-                    if !tv.macStatus.isEmpty { Text(tv.macStatus).font(.caption) }
-                    Button("Retrieve MAC again") { tv.refreshMACPermission() }.disabled(!tv.connected)
+                    if tv.host.isEmpty && !tv.discoveryStatus.isEmpty && !tv.searching {
+                        Text(tv.discoveryStatus).font(.caption).foregroundStyle(.secondary)
+                    }
                 }
                 Toggle("Cursor mode", isOn: $cursorModeEnabled)
-                if !tv.status.isEmpty { Text(tv.status).font(.system(.caption, design: .monospaced)) }
+                DisclosureGroup("Advanced") {
+                    TextField("TV IP address", text: $host).keyboardType(.decimalPad).autocorrectionDisabled()
+                        .accessibilityLabel("TV IP address")
+                    TextField("MAC address", text: $mac).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .accessibilityLabel("TV MAC address")
+                    Button("Connect") {
+                        tv.configure(configuration)
+                        dismiss()
+                    }.disabled(!configuration.valid)
+                    Button("Retrieve MAC again") { tv.refreshMACPermission() }.disabled(!tv.connected)
+                }
             }
             .navigationTitle(tv.host.isEmpty ? "Set up TV" : "Settings")
             .navigationBarTitleDisplayMode(.inline)

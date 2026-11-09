@@ -81,6 +81,62 @@ enum TVDiscovery {
         } onCancel: { socket.cancel(with: .goingAway, reason: nil) }
     }
 
+    private enum Resolution { case found(DiscoveredTV), exhausted, expired }
+
+    // The TV's control server can disappear briefly between standby and startup.
+    // Keep retrying its saved address while discovery checks for a changed address.
+    static func resolve(
+        host: String, identity: String,
+        probe: @escaping @Sendable (String) async -> DiscoveredTV? = { await TVDiscovery.probe($0) },
+        scan: @escaping @Sendable (String) async throws -> [DiscoveredTV] = { try await TVDiscovery.scan(matching: $0) },
+        pause: @escaping @Sendable () async throws -> Void = { try await Task.sleep(for: .seconds(2)) },
+        timeout: Duration = .seconds(60)
+    ) async -> DiscoveredTV? {
+        await withTaskGroup(of: Resolution.self) { group in
+            group.addTask {
+                for _ in 0..<30 {
+                    guard !Task.isCancelled else { return .exhausted }
+                    if let tv = await probe(host), tv.id == identity { return .found(tv) }
+                    do { try await pause() } catch { return .exhausted }
+                }
+                return .exhausted
+            }
+            group.addTask {
+                // Allow a normal startup a few direct retries before scanning.
+                for _ in 0..<2 {
+                    do {
+                        for _ in 0..<3 { try await pause() }
+                        guard !Task.isCancelled else { return .exhausted }
+                        if let tv = try await scan(identity).first(where: { $0.id == identity }) {
+                            return .found(tv)
+                        }
+                    } catch {
+                        // A missing Wi-Fi interface must not cancel direct retries.
+                        if Task.isCancelled { return .exhausted }
+                    }
+                }
+                return .exhausted
+            }
+            group.addTask {
+                do { try await Task.sleep(for: timeout) } catch { return .exhausted }
+                return .expired
+            }
+            var exhausted = 0
+            while let result = await group.next() {
+                if Task.isCancelled { break }
+                switch result {
+                case .found(let tv): group.cancelAll(); return tv
+                case .expired: group.cancelAll(); return nil
+                case .exhausted:
+                    exhausted += 1
+                    if exhausted == 2 { group.cancelAll(); return nil }
+                }
+            }
+            group.cancelAll()
+            return nil
+        }
+    }
+
     static func scan(matching identity: String? = nil) async throws -> [DiscoveredTV] {
         let hosts = try localHosts()
         return await withTaskGroup(of: DiscoveredTV?.self) { group in
