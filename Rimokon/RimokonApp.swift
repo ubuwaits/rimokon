@@ -18,14 +18,13 @@ struct RimokonView: View {
     @AppStorage("cursorModeEnabled") private var cursorModeEnabled = false
     @Environment(\.scenePhase) private var phase
     @State private var settings = false
-    @State private var confirmPower = false
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(spacing: 16) {
                     HStack(spacing: 12) {
                         key("power", tv.isTVOn ? "Power off" : "Power on", requiresConnection: false) {
-                            if tv.isTVOn { confirmPower = true } else if tv.mac.isEmpty || tv.host.isEmpty { settings = true } else { tv.powerOn() }
+                            if tv.isTVOn { tv.powerOff() } else if tv.mac.isEmpty || tv.host.isEmpty { settings = true } else { tv.powerOn() }
                         }.disabled(tv.waking)
                         Button { feedback(); settings = true } label: {
                             Circle()
@@ -97,9 +96,6 @@ struct RimokonView: View {
             TVSettingsView(tv: tv, cursorModeEnabled: $cursorModeEnabled)
         }
 
-        .confirmationDialog("Turn off TV?", isPresented: $confirmPower, titleVisibility: .visible) {
-            Button("Turn off", role: .destructive) { tv.powerOff() }
-        }
         .onChange(of: phase) { _, value in
             if value == .active && !tv.host.isEmpty { tv.connect() }
             else if value == .background { tv.disconnect() }
@@ -124,7 +120,7 @@ struct RimokonView: View {
 
     private var trackpadMode: TrackpadMode { cursorModeEnabled ? .cursor : .directional }
     private var pointerAllowed: Bool {
-        phase == .active && tv.navigationReady && !settings && !confirmPower
+        phase == .active && tv.navigationReady && !settings
     }
     private func feedback() { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
     private func key(_ symbol: String, _ label: String, selected: Bool = false, requiresConnection: Bool = true, action: @escaping () -> Void) -> some View {
